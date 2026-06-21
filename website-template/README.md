@@ -80,18 +80,11 @@ All surrounding prose, run commands, and alerts stay untouched.
 
 No CSS changes are needed; the table inherits the site's existing styling.
 
-## Running the tests
+## Tests
 
-The tests build a minimal throwaway Hugo site and assert on the generated HTML
-across the full edge-case matrix (column auto-hide, numeric-zero default,
-required-false, possible_values, missing and empty data, markdown descriptions,
-awkward default values, and the shipped example files).
+The shortcode is covered by a Hugo build harness and 14 edge-case tests (column
+auto-hide, numeric-zero default, required-false, possible_values, missing and empty
+data, markdown descriptions, awkward defaults, and the shipped example files). The
+suite is kept as a Gist for review:
 
-```bash
-npm install                              # provides hugo-extended
-python -m pip install -r ../requirements-dev.txt
-python -m pytest ../tests/ -v
-```
-
-Hugo comes from the `hugo-extended` npm devDependency, so no system Hugo install
-is needed. The tests do not require Go or the Docsy theme.
+https://gist.github.com/StrikerEureka34/ba06793ce2c23cd0792242b1987f542d
