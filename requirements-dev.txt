@@ -1,0 +1,2 @@
+pytest>=8
+beautifulsoup4>=4.12
