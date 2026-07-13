@@ -1,0 +1,55 @@
+name: Trigger docs sync on merged PR
+
+# When a PR that changes a scenario's env.sh or krknctl-input.json is merged,
+# tell the website's Doc Sync workflow to regenerate that scenario's docs.
+# Uses a GitHub App token scoped to website_2 (handover-friendly: no personal PAT).
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dispatch:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the changed scenarios
+        id: scenario
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+          # A single PR can touch several scenarios; sync every one, not just the first.
+          scenarios=$(echo "$files" | grep -E '^[^/]+/(env\.sh|krknctl-input\.json)$' | cut -d/ -f1 | sort -u | tr '\n' ' ')
+          if [ -n "$scenarios" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            echo "names=$scenarios" >> "$GITHUB_OUTPUT"
+            echo "Changed scenarios: $scenarios"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+            echo "No scenario env.sh / krknctl-input.json changed; skipping."
+          fi
+
+      - name: Mint a website_2-scoped app token
+        if: steps.scenario.outputs.relevant == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: StrikerEureka34
+          repositories: website_2
+
+      - name: Dispatch doc-sync on the website
+        if: steps.scenario.outputs.relevant == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # One dispatch carrying every changed scenario; the bot opens a single PR.
+          gh workflow run doc-sync.lock.yml \
+            --repo StrikerEureka34/website_2 \
+            -f scenarios="${{ steps.scenario.outputs.names }}"
