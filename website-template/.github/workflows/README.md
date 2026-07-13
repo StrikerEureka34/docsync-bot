@@ -4,7 +4,7 @@ Copy these into the website repo's `.github/workflows/`. They are the runtime ha
 
 ## Files
 
-- `doc-sync.md` and `doc-sync.lock.yml`: the gh-aw agentic workflow. It runs the bot on a `/fix` comment or a dispatch from krkn-hub, generates the parameter data files, and opens a draft PR. `doc-sync.md` is the source, `doc-sync.lock.yml` is compiled from it by `gh aw compile` and is the file that actually runs.
+- `doc-sync.md`: the gh-aw agentic workflow source. It runs the bot on a `/fix` comment or a dispatch from krkn-hub, generates the parameter data files, and opens a draft PR. Run `gh aw compile` to produce `doc-sync.lock.yml`, the file GitHub Actions actually runs. That lock is generated, so it is not committed here.
 - `hugo-build.yml`: a render gate that fails a PR if any generated page or shortcode does not build.
 
 ## Change these for production
