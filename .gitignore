@@ -1,0 +1,7 @@
+node_modules/
+public/
+resources/
+__pycache__/
+.pytest_cache/
+*.pyc
+package-lock.json
