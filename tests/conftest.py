@@ -1,10 +1,19 @@
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from shutil import which
 
 import pytest
 
+# Bot unit tests: make the `bot` package importable and set placeholder env.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+os.environ.setdefault("OPENROUTER_API_KEY", "test-key-for-tests")
+os.environ.setdefault("GITHUB_TOKEN", "test-token-for-tests")
+
+# Shortcode Hugo build harness (used only by the shortcode tests). hugo is looked
+# up lazily at build time so the bot tests can run without hugo or npm installed.
 REPO = Path(__file__).resolve().parents[1]                       # docsync-bot
 SHORTCODE = REPO / "website-template" / "layouts" / "shortcodes" / "param-table.html"
 
@@ -31,8 +40,6 @@ def find_hugo() -> str:
         "hugo not found. Run `npm install` in docsync-bot (provides hugo-extended)."
     )
 
-
-HUGO = find_hugo()
 
 HUGO_CONFIG = """\
 baseURL: http://example.org/
@@ -78,7 +85,7 @@ class Site:
 
     def build(self) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [HUGO, "--logLevel", "warn", "--destination", str(self.root / "public")],
+            [find_hugo(), "--logLevel", "warn", "--destination", str(self.root / "public")],
             cwd=self.root, capture_output=True, text=True,
         )
 
