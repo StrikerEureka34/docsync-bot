@@ -79,8 +79,36 @@ def test_block_drift_marked_is_safe_and_applies():
     upstream = "application_outage:\n  duration: 900\n"
     fetcher = lambda r, ref, p: upstream
     drift = ks.block_drift(TAB_MARKED, fetcher)
-    assert drift["safe"] is True
+    assert drift["safe"] is True and drift["mismatch"] is False
     assert "duration: 900" in ks.apply_block_update(TAB_MARKED, drift)
+
+
+# anchor mismatch: block names a scenario the linked file never mentions
+
+KUBEVIRT_TAB = (
+    f"Example scenario file: [x]({HUB})\n\n```yaml\nscenarios:\n"
+    "  - name: \"kubevirt vm outage\"\n    scenario: kubevirt_vm_outage\n"
+    "    parameters:\n      timeout: 60\n```\n")
+SNAPSHOT_UPSTREAM = "scenarios:\n  - snapshot_creation_disruption:\n      vm_name: x\n"
+
+
+def test_anchor_mismatch_flagged_not_drift():
+    drift = ks.block_drift(KUBEVIRT_TAB, lambda r, ref, p: SNAPSHOT_UPSTREAM)
+    assert drift["mismatch"] is True
+    assert drift["safe"] is False
+    assert "kubevirt_vm_outage" in drift["ids"]
+
+
+def test_real_drift_is_not_mismatch():
+    # block names application_outage and the linked file mentions it -> real drift
+    drift = ks.block_drift(TAB, lambda r, ref, p: "application_outage:\n  duration: 900\n")
+    assert drift["mismatch"] is False
+
+
+def test_mismatch_never_safe_even_with_marker():
+    marked = KUBEVIRT_TAB.replace("```yaml", f"<!-- krkn-src: {HUB} -->\n```yaml", 1)
+    drift = ks.block_drift(marked, lambda r, ref, p: SNAPSHOT_UPSTREAM)
+    assert drift["mismatch"] is True and drift["safe"] is False
 
 
 # --- orchestration + walk ---

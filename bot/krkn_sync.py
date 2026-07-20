@@ -7,10 +7,11 @@ three deterministic, report-only-or-draft-PR things:
   1. Link check   - find dead github.com/krkn-chaos links.
   2. Link fix     - a moved file with one clear new path -> a corrected-link edit.
   3. Config sync  - an "Example scenario file: [link]" anchor whose embedded YAML
-                    block drifted from its upstream source. Reports the drift; only
-                    auto-replaces a block that carries a `<!-- krkn-src: url -->`
-                    provenance marker (proof the block is a verbatim mirror), so a
-                    hand-customized block is never clobbered.
+                    block differs from its upstream source. Splits this into a wrong
+                    anchor (the block names a scenario the linked file never mentions)
+                    and real drift. Only auto-replaces a block that carries a
+                    `<!-- krkn-src: url -->` provenance marker (proof it is a verbatim
+                    mirror), so a hand-customized or mismatched block is never clobbered.
 
 All network I/O (link resolver, repo tree, upstream fetcher) is injected, so the
 whole module is unit-testable offline. The CLI wires in stdlib defaults.
@@ -145,9 +146,25 @@ def _norm(block):
     return "\n".join(lines)
 
 
+# Keys that structure a scenario file but are not the scenario name itself.
+_STRUCTURAL = {"scenarios", "kraken", "parameters", "config", "input_list", "spec"}
+
+
+def _block_ids(block):
+    """Scenario identifiers a doc block claims to document: the `scenario:` plugin
+    id and any top-level scenario key. Used to tell a wrong anchor (none of these
+    appear in the linked file) from real drift (they do, but the content moved)."""
+    ids = set(re.findall(r"scenario:\s*['\"]?([a-z][a-z0-9_-]{3,})", block))
+    for m in re.finditer(r"^([a-z][a-z0-9_]{3,}):\s*$", block, re.MULTILINE):
+        if m.group(1) not in _STRUCTURAL:
+            ids.add(m.group(1))
+    return ids
+
+
 def block_drift(text, fetcher):
     """None if there is no anchor or the block matches upstream. Otherwise a dict
-    describing the drift and whether it is safe to auto-replace."""
+    describing the drift, whether the anchor points at the wrong file, and whether
+    it is safe to auto-replace."""
     anchor = find_anchor(text)
     if not anchor:
         return None
@@ -158,12 +175,17 @@ def block_drift(text, fetcher):
     upstream = fetcher(*parts)
     if upstream is None or _norm(block) == _norm(upstream):
         return None  # unreachable, or already in sync
+    # Wrong source: the block names a scenario that the linked file never mentions,
+    # so this is a bad anchor, not drift. Never auto-replace against the wrong file.
+    ids = _block_ids(block)
+    mismatch = bool(ids) and not any(i in upstream for i in ids)
     # Auto-replace only a block whose marker names this same upstream file: that
     # marker is the proof the block is a verbatim mirror, not a hand-edited copy.
     # TODO: no tab carries this marker yet, so `safe` is always False until the
     # anchor-marking cleanup lands. Until then this path reports, never rewrites.
-    safe = marker_url == url
-    return {"url": url, "safe": safe, "old": block, "new": upstream}
+    safe = (marker_url == url) and not mismatch
+    return {"url": url, "safe": safe, "mismatch": mismatch,
+            "ids": sorted(ids), "old": block, "new": upstream}
 
 
 def apply_block_update(text, drift):
@@ -196,6 +218,11 @@ def sync_text(text, resolver, tree, fetcher):
     if drift:
         if drift["safe"]:
             new_text = apply_block_update(new_text, drift)
+        elif drift["mismatch"]:
+            named = ", ".join(drift["ids"]) or "block"
+            entries.append(
+                f"anchor mismatch: {named} is not in {drift['url']} "
+                "(wrong source file, review)")
         else:
             entries.append(
                 f"config block drifted from {drift['url']} "
