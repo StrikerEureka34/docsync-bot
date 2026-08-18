@@ -10,7 +10,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 MAX_LEN = 120
-_TIMEOUT = 30
+# 30s was too tight: a free-tier endpoint answered the same prompt in 20s, 27s
+# and 83s within one hour, so the limit has to cover the slow end, not the fast.
+_TIMEOUT = int(os.environ.get("LLM_TIMEOUT", "120"))
 # The endpoint the project runs. Only the key is a secret; the env overrides are
 # for local experiments, so CI needs LLM_API_KEY and nothing else.
 _BASE_URL = "https://model.cclm-chaos.aws.rhperfscale.org/v1"
@@ -152,8 +154,9 @@ def _fail(errors, msg):
 
 def describe(scenario, names, ctx, transport=None, errors=None):
     """{name: sentence} for the names that produced text.
-    Returns {} on any failure (non-200, bad JSON, timeout, unset config): a blank
-    cell is already legal and reported, so a failed call never fails the run."""
+    Returns {} on any failure (non-200, bad JSON, timeout, no credentials): a
+    blank cell is already legal and reported, so a failed call never fails the
+    run."""
     if not names:
         return {}
     if transport is None:
