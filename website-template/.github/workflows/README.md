@@ -40,6 +40,17 @@ The source URLs, the bot install URL, the target repo and `roles` already point 
 
 `LLM_BASE_URL` must be `https`. The key travels on it as a bearer header, and `describe.py` refuses a plaintext base rather than sending it.
 
-Unset all three and the run still passes: descriptions go blank and the gap table in the commit message names each one. The krkn-operator target is unaffected either way, because it never calls the model.
+### Checking the key works
+
+A wrong key fails exactly like a missing one: the run stays green and the cells come out blank. **"The run passed" is not the check.** Look at the gap table in the commit message:
+
+| | |
+| --- | --- |
+| Working | rows sourced `llm` |
+| Dead, or unset | `model unavailable: endpoint returned HTTP 401: ...`, or `no LLM_API_KEY set` |
+
+Check it after setting the secret and after any provider change. The krkn-operator target is unaffected either way, because it never calls the model.
+
+Background, including which NVIDIA models clear gh-aw's api-proxy and why: [docsync-bot#24](https://github.com/krkn-chaos/docsync-bot/issues/24).
 
 Both workflows need the GitHub App: `APP_ID` as a repository variable and `APP_PRIVATE_KEY` as a secret. `drift-report.yml` uses it so the rolling issue has a stable author instead of `github-actions[bot]`.
