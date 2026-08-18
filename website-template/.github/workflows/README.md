@@ -38,7 +38,7 @@ The source URLs, the bot install URL, the target repo and `roles` already point 
 | an inference provider, the shipped default | an inference key | that provider's quota. No GitHub scope |
 | `https://api.githubcopilot.com` | a GitHub token with Copilot access | **a GitHub credential** |
 
-`LLM_BASE_URL` must be `https`. The key travels on it as a bearer header, and `describe.py` refuses a plaintext base rather than sending it.
+`LLM_BASE_URL` must be `https`. The key travels on it as a bearer header, and `describe.py` refuses a plaintext base rather than sending it. It also refuses to follow a redirect: urllib keeps the bearer header across a hop and allows `https` -> `http`, so an endpoint could otherwise hand the key to any host in the clear.
 
 ### Checking the key works
 
@@ -48,6 +48,7 @@ A wrong key fails exactly like a missing one: the run stays green and the cells 
 | --- | --- |
 | Working | rows sourced `llm` |
 | Dead, or unset | `model unavailable: endpoint returned HTTP 401: ...`, or `no LLM_API_KEY set` |
+| Unreachable, or redirecting | `model unavailable: endpoint unreachable (URLError)`, or an `HTTP 30x` the bot refused to follow |
 
 Check it after setting the secret and after any provider change. The krkn-operator target is unaffected either way, because it never calls the model.
 
