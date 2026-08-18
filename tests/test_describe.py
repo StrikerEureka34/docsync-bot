@@ -153,6 +153,28 @@ def test_a_missing_key_is_named():
     assert errors == ["no LLM_API_KEY set"]
 
 
+def test_a_plaintext_base_url_is_refused_before_the_key_is_sent(monkeypatch):
+    """LLM_BASE_URL is deployment-supplied and the key rides it as a bearer
+    header, so http would put the credential on the wire."""
+    monkeypatch.setenv("LLM_API_KEY", "sekrit")
+    monkeypatch.setenv("LLM_BASE_URL", "http://model.example/v1")
+    errors = []
+    assert describe("s", ["X"], CTX, errors=errors) == {}
+    assert errors and "must be https" in errors[0]
+    assert "sekrit" not in errors[0]
+
+
+def test_the_timeout_is_configurable(monkeypatch):
+    """30s cut off the slow end of a real endpoint: 20.6s, 27.4s and 83.3s within
+    one hour on a free tier."""
+    import importlib
+    import bot.describe as d
+    monkeypatch.setenv("LLM_TIMEOUT", "45")
+    assert importlib.reload(d)._TIMEOUT == 45
+    monkeypatch.delenv("LLM_TIMEOUT")
+    assert importlib.reload(d)._TIMEOUT == 120
+
+
 def test_the_key_alone_produces_the_full_request(monkeypatch):
     """The URL is built by concatenation, so a stray slash or a doubled /v1
     would 404 at runtime with nothing in the suite to catch it."""

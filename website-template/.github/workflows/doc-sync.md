@@ -83,8 +83,18 @@ steps:
       KRKN_PATH: ${{ runner.temp }}/krkn
       KRKN_OPERATOR_PATH: ${{ runner.temp }}/krkn-operator
       GH_AW_REPORT_DIR: ${{ runner.temp }}
-      # No LLM_* yet: which endpoint and credential is a separate decision. The
-      # operator target never reaches the model, so it is unaffected either way.
+      # Call 1 of the two model calls, and the only one keyed here. It runs before
+      # the firewall, so it needs no network.allowed entry.
+      LLM_BASE_URL: https://integrate.api.nvidia.com/v1
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_MODEL: nvidia/nemotron-3.5-lightning-30b-a3b
+      # GitHub Copilot instead. LLM_API_KEY must then hold a GitHub token with
+      # Copilot access, so it carries GitHub scope rather than inference only.
+      # LLM_BASE_URL: https://api.githubcopilot.com
+      # LLM_MODEL: gpt-4o
+      #
+      # Any OpenAI-compatible /v1 endpoint works: describe.py has no vendor SDK.
+      # Unset all three and the built-in default is unreachable from Actions.
     run: |
       for target in ${{ steps.scn.outputs.scenarios }}; do
         echo "Generating: $target"

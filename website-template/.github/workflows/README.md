@@ -26,7 +26,20 @@ Both workflows clone all three sources. krkn-hub and krkn go together because a 
 
 The source URLs, the bot install URL, the target repo and `roles` already point at production. What is left:
 
-- pick the describer endpoint: `LLM_BASE_URL`, `LLM_API_KEY` and `LLM_MODEL` on the generation step. Unset falls back to a built-in host measured unreachable from GitHub Actions, so every model-written description would be blank while the run stayed green. The krkn-operator target is unaffected: it never calls the model
+- set one secret, `LLM_API_KEY`, for the endpoint named on the generation step. It ships pointed at NVIDIA NIM, with GitHub Copilot commented beside it. Any OpenAI-compatible `/v1` endpoint works
 - recompile with `gh aw compile` after editing `doc-sync.md`
+
+## The model key
+
+`LLM_API_KEY` is the only model credential, and **its power follows the endpoint**:
+
+| `LLM_BASE_URL` | What the key has to be | If it leaked |
+| --- | --- | --- |
+| an inference provider, the shipped default | an inference key | that provider's quota. No GitHub scope |
+| `https://api.githubcopilot.com` | a GitHub token with Copilot access | **a GitHub credential** |
+
+`LLM_BASE_URL` must be `https`. The key travels on it as a bearer header, and `describe.py` refuses a plaintext base rather than sending it.
+
+Unset all three and the run still passes: descriptions go blank and the gap table in the commit message names each one. The krkn-operator target is unaffected either way, because it never calls the model.
 
 Both workflows need the GitHub App: `APP_ID` as a repository variable and `APP_PRIVATE_KEY` as a secret. `drift-report.yml` uses it so the rolling issue has a stable author instead of `github-actions[bot]`.
