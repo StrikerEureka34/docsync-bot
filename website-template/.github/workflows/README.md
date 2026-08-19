@@ -27,7 +27,7 @@ Both workflows clone all three sources. krkn-hub and krkn go together because a 
 The source URLs, the bot install URL, the target repo and `roles` already point at production. What is left:
 
 - set one secret, `LLM_API_KEY`, for the endpoint named on the generation step. It ships pointed at NVIDIA NIM, with GitHub Copilot commented beside it. Any OpenAI-compatible `/v1` endpoint works
-- recompile with `gh aw compile` after editing `doc-sync.md`
+- recompile with `gh aw compile` after editing `doc-sync.md`. Only the workflow needs it: the bot installs from `@main` at run time, so a Python change ships without a recompile, at the cost of tracking that branch rather than a pinned commit
 
 ## The model key
 
@@ -37,6 +37,8 @@ The source URLs, the bot install URL, the target repo and `roles` already point 
 | --- | --- | --- |
 | an inference provider, the shipped default | an inference key | that provider's quota. No GitHub scope |
 | `https://api.githubcopilot.com` | a GitHub token with Copilot access | **a GitHub credential** |
+
+**Rotate `LLM_API_KEY` when you change the endpoint.** One secret name holds both kinds of credential, so leaving the old value in place points a GitHub token at an inference provider, or the reverse.
 
 `LLM_BASE_URL` must be `https`. The key travels on it as a bearer header, and `describe.py` refuses a plaintext base rather than sending it. It also refuses to follow a redirect: urllib keeps the bearer header across a hop and allows `https` -> `http`, so an endpoint could otherwise hand the key to any host in the clear.
 
