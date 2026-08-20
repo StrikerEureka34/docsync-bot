@@ -150,14 +150,14 @@ def test_a_missing_key_is_named():
     """The key is the only setting CI supplies, so it is the only one to report."""
     errors = []
     assert describe("s", ["X"], CTX, errors=errors) == {}
-    assert errors == ["no LLM_API_KEY set"]
+    assert errors == ["no DOC_SYNC_BOT_LLM_API_KEY set"]
 
 
 def test_a_plaintext_base_url_is_refused_before_the_key_is_sent(monkeypatch):
-    """LLM_BASE_URL is deployment-supplied and the key rides it as a bearer
+    """DOC_SYNC_BOT_LLM_BASE_URL is deployment-supplied and the key rides it as a bearer
     header, so http would put the credential on the wire."""
-    monkeypatch.setenv("LLM_API_KEY", "sekrit")
-    monkeypatch.setenv("LLM_BASE_URL", "http://model.example/v1")
+    monkeypatch.setenv("DOC_SYNC_BOT_LLM_API_KEY", "sekrit")
+    monkeypatch.setenv("DOC_SYNC_BOT_LLM_BASE_URL", "http://model.example/v1")
     errors = []
     assert describe("s", ["X"], CTX, errors=errors) == {}
     assert errors and "must be https" in errors[0]
@@ -169,9 +169,9 @@ def test_the_timeout_is_configurable(monkeypatch):
     one hour on a free tier."""
     import importlib
     import bot.describe as d
-    monkeypatch.setenv("LLM_TIMEOUT", "45")
+    monkeypatch.setenv("DOC_SYNC_BOT_LLM_TIMEOUT", "45")
     assert importlib.reload(d)._TIMEOUT == 45
-    monkeypatch.delenv("LLM_TIMEOUT")
+    monkeypatch.delenv("DOC_SYNC_BOT_LLM_TIMEOUT")
     assert importlib.reload(d)._TIMEOUT == 120
 
 
@@ -185,7 +185,7 @@ def test_the_key_alone_produces_the_full_request(monkeypatch):
         return {"choices": [{"message": {"content": '{"X": "Plain."}'}}]}
 
     monkeypatch.setattr("bot.describe._post", fake_post)
-    monkeypatch.setenv("LLM_API_KEY", "k")
+    monkeypatch.setenv("DOC_SYNC_BOT_LLM_API_KEY", "k")
     assert describe("s", ["X"], CTX) == {"X": "Plain."}
     assert seen == {
         "url": "https://model.cclm-chaos.aws.rhperfscale.org/v1/chat/completions",
@@ -286,7 +286,7 @@ def test_an_error_body_does_not_carry_the_key_into_the_report(monkeypatch):
     import io
     import urllib.error
 
-    monkeypatch.setenv("LLM_API_KEY", "nvapi-SEKRIT-0123456789")
+    monkeypatch.setenv("DOC_SYNC_BOT_LLM_API_KEY", "nvapi-SEKRIT-0123456789")
 
     def boom(body):
         raise urllib.error.HTTPError(

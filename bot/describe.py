@@ -12,9 +12,9 @@ from pathlib import Path
 MAX_LEN = 120
 # 30s was too tight: a free-tier endpoint answered the same prompt in 20s, 27s
 # and 83s within one hour, so the limit has to cover the slow end, not the fast.
-_TIMEOUT = int(os.environ.get("LLM_TIMEOUT", "120"))
+_TIMEOUT = int(os.environ.get("DOC_SYNC_BOT_LLM_TIMEOUT", "120"))
 # The endpoint the project runs. Only the key is a secret; the env overrides are
-# for local experiments, so CI needs LLM_API_KEY and nothing else.
+# for local experiments, so CI needs DOC_SYNC_BOT_LLM_API_KEY and nothing else.
 _BASE_URL = "https://model.cclm-chaos.aws.rhperfscale.org/v1"
 _MODEL = "qwen3.5:4b"
 _NUMBER_OR_QUOTED = re.compile(r'"[^"]+"|\b\d+\b')
@@ -178,19 +178,19 @@ def describe(scenario, names, ctx, transport=None, errors=None):
     run."""
     if not names:
         return {}
-    key = os.environ.get("LLM_API_KEY")
+    key = os.environ.get("DOC_SYNC_BOT_LLM_API_KEY")
     if transport is None:
         if not key:
-            return _fail(errors, "no LLM_API_KEY set")
-        base = os.environ.get("LLM_BASE_URL", _BASE_URL).rstrip("/")
+            return _fail(errors, "no DOC_SYNC_BOT_LLM_API_KEY set")
+        base = os.environ.get("DOC_SYNC_BOT_LLM_BASE_URL", _BASE_URL).rstrip("/")
         # The key rides this connection as a bearer header, so a plaintext base
         # would put it on the wire. Refuse rather than send it.
         if not base.startswith("https://"):
-            return _fail(errors, f"LLM_BASE_URL must be https, got {base[:40]!r}")
+            return _fail(errors, f"DOC_SYNC_BOT_LLM_BASE_URL must be https, got {base[:40]!r}")
         transport = lambda body: _post(base + "/chat/completions", key, body)  # noqa: E731
     # No response_format: some endpoints reject the field outright, and the reply
     # is parsed with json.loads either way.
-    body = {"model": os.environ.get("LLM_MODEL", _MODEL),
+    body = {"model": os.environ.get("DOC_SYNC_BOT_LLM_MODEL", _MODEL),
             "temperature": 0,
             "messages": [{"role": "system", "content": _SYSTEM},
                          {"role": "user",

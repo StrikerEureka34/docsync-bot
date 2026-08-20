@@ -85,13 +85,13 @@ steps:
       GH_AW_REPORT_DIR: ${{ runner.temp }}
       # Call 1 of the two model calls, and the only one keyed here. It runs before
       # the firewall, so it needs no network.allowed entry.
-      LLM_BASE_URL: https://integrate.api.nvidia.com/v1
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_MODEL: nvidia/nemotron-3.5-lightning-30b-a3b
-      # GitHub Copilot instead. LLM_API_KEY must then hold a GitHub token with
+      DOC_SYNC_BOT_LLM_BASE_URL: https://integrate.api.nvidia.com/v1
+      DOC_SYNC_BOT_LLM_API_KEY: ${{ secrets.DOC_SYNC_BOT_LLM_API_KEY }}
+      DOC_SYNC_BOT_LLM_MODEL: nvidia/nemotron-3.5-lightning-30b-a3b
+      # GitHub Copilot instead. DOC_SYNC_BOT_LLM_API_KEY must then hold a GitHub token with
       # Copilot access, so it carries GitHub scope rather than inference only.
-      # LLM_BASE_URL: https://api.githubcopilot.com
-      # LLM_MODEL: gpt-4o
+      # DOC_SYNC_BOT_LLM_BASE_URL: https://api.githubcopilot.com
+      # DOC_SYNC_BOT_LLM_MODEL: gpt-4o
       #
       # Any OpenAI-compatible /v1 endpoint works: describe.py has no vendor SDK.
       # Unset all three and the built-in default is unreachable from Actions.
@@ -163,8 +163,8 @@ safe-outputs:
   # A second model call reusing this engine. Turn it off for a rate-limited
   # provider with `threat-detection: false`, here and not under create-pull-request.
   github-app:
-    app-id: ${{ vars.APP_ID }}
-    private-key: ${{ secrets.APP_PRIVATE_KEY }}
+    app-id: ${{ vars.DOC_SYNC_BOT_APP_ID }}
+    private-key: ${{ secrets.DOC_SYNC_BOT_APP_PRIVATE_KEY }}
   create-pull-request:
     target-repo: "krkn-chaos/website"
     draft: true
