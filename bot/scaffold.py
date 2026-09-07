@@ -20,10 +20,18 @@ def _call(scenario, source):
     return f'{{{{< param-table scenario="{scenario}" source="{source}"{prefix} >}}}}'
 
 
+def param_tables(text):
+    """How many parameter tables the page carries."""
+    lines = text.splitlines(keepends=True)
+    return sum(1 for h, _e, _r in _tables(lines) if _is_param_table(lines[h]))
+
+
 def inject_shortcode(text, scenario, source):
     """Replace the parameter table with the param-table shortcode call.
-    Idempotent: returns text unchanged if a param-table call is already present."""
-    if "param-table" in text:
+    Idempotent: returns text unchanged if a param-table call is already present.
+    Several tables are left alone: replacing one strands the rest, and which rows
+    belong to which table is the source's call, not ours."""
+    if "param-table" in text or param_tables(text) > 1:
         return text
     lines = text.splitlines(keepends=True)
     for header, end, _rows in _tables(lines):
@@ -272,21 +280,29 @@ def _create_scenario_page(website_root, scenario, sources):
 def scaffold_scenario(scenario, website_root):
     """Inject the param-table shortcode into the tab files for sources that have
     generated data. Creates the page if the scenario has none, for those sources
-    only, so a source with no data never gets an empty tab."""
+    only, so a source with no data never gets an empty tab.
+    Returns one report line per tab left alone."""
     root = Path(website_root)
     sources = [s for s in ("krkn-hub", "krknctl")
                if (root / "data" / "params" / scenario / f"{s}.yaml").exists()]
     if not sources:
-        return
+        return []
     scn_dir = _find_scenario_dir(website_root, scenario)
     if scn_dir is None:
         scn_dir = _create_scenario_page(website_root, scenario, sources)
+    report = []
     for source in sources:
         tab = scn_dir / f"_tab-{source}.md"
         if not tab.exists():
             tab.write_text(_call(scenario, source) + "\n", encoding="utf-8")
             continue
         original = tab.read_text(encoding="utf-8")
+        n = param_tables(original)
+        if n > 1 and "param-table" not in original:
+            report.append(f"{tab.name}: {n} parameter tables, left alone. Give each "
+                          "param a group in the source, then split the page by group")
+            continue
         new = inject_shortcode(original, scenario, source)
         if new != original:
             tab.write_text(new, encoding="utf-8")
+    return report

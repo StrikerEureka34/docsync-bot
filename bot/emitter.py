@@ -24,8 +24,8 @@ def _param_dict(rec, description, source, scenario):
     d = {"name": rec.name, "description": _escape(description)}
     if rec.description_source in _FALLBACK_SOURCES:
         d["description_source"] = rec.description_source
-    # Only global params have a group. It travels in the data so one file can
-    # hold every group and the shortcode filters on it.
+    # The group travels in the data so one file can hold every group and the
+    # shortcode filters on it. No group means shared: it renders on every table.
     if rec.group is not None:
         d["group"] = rec.group
     if rec.type is not None:
@@ -80,8 +80,21 @@ def load_previous(path):
     return {p["name"]: p for p in data.get("params", [])}
 
 
+def _grouped(path):
+    """True if the committed file carries any group."""
+    path = Path(path)
+    if not path.exists():
+        return False
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return any(p.get("group") for p in data.get("params", []))
+
+
 def emit_data_file(out_root, scenario, source, records, descriptions, source_ref):
     path = Path(out_root) / "data" / "params" / scenario / f"{source}.yaml"
+    # Dropping every group leaves each group= call with no rows, which fails the
+    # Hugo build a step later with an unrelated-looking error.
+    if _grouped(path) and not any(r.group for r in records):
+        raise ValueError(f"{path} has grouped rows but this run produced none")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(emit_data_text(scenario, source, records, descriptions, source_ref),
                     encoding="utf-8")

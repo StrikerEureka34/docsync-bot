@@ -1,6 +1,8 @@
+import pytest
 import yaml
 from bot.parser import ParamRecord
-from bot.emitter import emit_data_text, load_descriptions, load_previous
+from bot.emitter import (emit_data_file, emit_data_text, load_descriptions,
+                         load_previous)
 
 
 def test_krkn_hub_omits_absent_optional_fields():
@@ -28,7 +30,8 @@ def test_group_is_emitted_when_present():
 
 
 def test_group_is_omitted_when_absent():
-    """Per-scenario params have no group and must not gain an empty key."""
+    """No group means shared, and the shortcode reads that off the key's absence,
+    so an ungrouped param must not gain an empty one."""
     p = yaml.safe_load(emit_data_text(
         "node-scenarios", "krkn-hub", [ParamRecord(name="ACTION")],
         {"ACTION": "Act."}, "r"))["params"][0]
@@ -219,3 +222,37 @@ def test_a_shortcode_call_in_a_description_cannot_run():
         "node-scenarios", "krkn-hub", [ParamRecord(name="X")],
         {"X": '{{% include "http://evil.example" %}}'}, "abc"))["params"][0]
     assert "{{" not in p["description"]
+
+
+def _write(path, *rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump({"params": list(rows)}), encoding="utf-8")
+
+
+def test_dropping_every_group_raises_instead_of_overwriting(tmp_path):
+    """The page still asks for each group by name, so a file that lost them all
+    fails the Hugo build a step later. See docsync-bot#36."""
+    out = tmp_path / "data/params/network-chaos/krkn-hub.yaml"
+    _write(out, {"name": "EGRESS", "description": "x", "group": "egress"})
+    with pytest.raises(ValueError, match="grouped rows but this run produced none"):
+        emit_data_file(tmp_path, "network-chaos", "krkn-hub",
+                       [ParamRecord(name="EGRESS")], {"EGRESS": "x"}, "abc")
+    assert "group: egress" in out.read_text(encoding="utf-8")
+
+
+def test_a_run_that_keeps_one_group_still_writes(tmp_path):
+    out = tmp_path / "data/params/network-chaos/krkn-hub.yaml"
+    _write(out, {"name": "EGRESS", "description": "x", "group": "egress"})
+    emit_data_file(tmp_path, "network-chaos", "krkn-hub",
+                   [ParamRecord(name="EGRESS", group="egress"),
+                    ParamRecord(name="DURATION")], {"EGRESS": "x", "DURATION": "y"}, "abc")
+    rows = yaml.safe_load(out.read_text(encoding="utf-8"))["params"]
+    assert [r.get("group") for r in rows] == ["egress", None]
+
+
+def test_an_ungrouped_file_stays_ungrouped(tmp_path):
+    out = tmp_path / "data/params/pvc-scenario/krkn-hub.yaml"
+    _write(out, {"name": "A", "description": "x"})
+    emit_data_file(tmp_path, "pvc-scenario", "krkn-hub",
+                   [ParamRecord(name="A")], {"A": "x"}, "abc")
+    assert "group" not in out.read_text(encoding="utf-8")

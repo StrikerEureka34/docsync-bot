@@ -213,6 +213,49 @@ def test_a_table_that_is_not_parameters_is_left_alone():
     assert "| DUR | how long |" not in out
 
 
+TWO_TABLES = """\
+##### Egress Scenarios
+
+| Parameter | Description |
+| --- | --- |
+| EGRESS | shape it |
+
+##### Ingress Scenarios
+
+| Parameter | Description |
+| --- | --- |
+| WAIT_DURATION | how long |
+"""
+
+
+def test_a_page_with_two_parameter_tables_is_left_alone():
+    """Replacing one strands the other, and no later run comes back for it: the
+    idempotency guard sees the call that got written. See docsync-bot#36."""
+    out = inject_shortcode(TWO_TABLES, "network-chaos", "krkn-hub")
+    assert out == TWO_TABLES
+
+
+def test_scaffold_reports_a_page_it_left_alone(tmp_path):
+    website = tmp_path / "site"
+    d = website / "content/en/docs/scenarios/network-chaos"
+    d.mkdir(parents=True)
+    (d / "_index.md").write_text("---\ntitle: X\n---\n", encoding="utf-8")
+    (d / "_tab-krkn-hub.md").write_text(TWO_TABLES, encoding="utf-8")
+    _data(website, "network-chaos", "krkn-hub")
+    report = scaffold_scenario("network-chaos", website)
+    assert (d / "_tab-krkn-hub.md").read_text(encoding="utf-8") == TWO_TABLES
+    assert len(report) == 1
+    assert report[0].startswith("_tab-krkn-hub.md: 2 parameter tables")
+
+
+def test_scaffold_reports_nothing_for_a_single_table_page(tmp_path):
+    website = tmp_path / "site"
+    tab = _make_page(website, "pvc-scenario", source_id="pvc-scenario")
+    _data(website, "pvc-scenario", "krkn-hub")
+    assert scaffold_scenario("pvc-scenario", website) == []
+    assert "param-table" in tab.read_text(encoding="utf-8")
+
+
 def test_an_argument_header_is_a_parameter_table():
     """7 of the 52 published tabs head the column Argument, not Parameter."""
     page = "| Argument | Description |\n| --- | --- |\n| DUR | how long |\n"
