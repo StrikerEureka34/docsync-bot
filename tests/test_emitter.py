@@ -234,7 +234,7 @@ def test_dropping_every_group_raises_instead_of_overwriting(tmp_path):
     fails the Hugo build a step later. See docsync-bot#36."""
     out = tmp_path / "data/params/network-chaos/krkn-hub.yaml"
     _write(out, {"name": "EGRESS", "description": "x", "group": "egress"})
-    with pytest.raises(ValueError, match="grouped rows but this run produced none"):
+    with pytest.raises(ValueError, match=r"would lose group\(s\) egress"):
         emit_data_file(tmp_path, "network-chaos", "krkn-hub",
                        [ParamRecord(name="EGRESS")], {"EGRESS": "x"}, "abc")
     assert "group: egress" in out.read_text(encoding="utf-8")
@@ -256,3 +256,25 @@ def test_an_ungrouped_file_stays_ungrouped(tmp_path):
     emit_data_file(tmp_path, "pvc-scenario", "krkn-hub",
                    [ParamRecord(name="A")], {"A": "x"}, "abc")
     assert "group" not in out.read_text(encoding="utf-8")
+
+
+def test_losing_one_group_of_several_raises(tmp_path):
+    """The surviving group does not save the page: the call for the lost one is
+    still there, matching nothing."""
+    out = tmp_path / "data/params/network-chaos/krkn-hub.yaml"
+    _write(out, {"name": "EGRESS", "description": "x", "group": "egress"},
+           {"name": "WAIT", "description": "y", "group": "ingress"})
+    with pytest.raises(ValueError, match=r"would lose group\(s\) ingress"):
+        emit_data_file(tmp_path, "network-chaos", "krkn-hub",
+                       [ParamRecord(name="EGRESS", group="egress")], {"EGRESS": "x"}, "abc")
+    assert "group: ingress" in out.read_text(encoding="utf-8")
+
+
+def test_a_new_group_alongside_the_old_ones_is_fine(tmp_path):
+    out = tmp_path / "data/params/network-chaos/krkn-hub.yaml"
+    _write(out, {"name": "EGRESS", "description": "x", "group": "egress"})
+    emit_data_file(tmp_path, "network-chaos", "krkn-hub",
+                   [ParamRecord(name="EGRESS", group="egress"),
+                    ParamRecord(name="WAIT", group="ingress")],
+                   {"EGRESS": "x", "WAIT": "y"}, "abc")
+    assert "group: ingress" in out.read_text(encoding="utf-8")

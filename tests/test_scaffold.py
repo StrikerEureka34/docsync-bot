@@ -245,7 +245,7 @@ def test_scaffold_reports_a_page_it_left_alone(tmp_path):
     report = scaffold_scenario("network-chaos", website)
     assert (d / "_tab-krkn-hub.md").read_text(encoding="utf-8") == TWO_TABLES
     assert len(report) == 1
-    assert report[0].startswith("_tab-krkn-hub.md: 2 parameter tables")
+    assert report[0].startswith("network-chaos/_tab-krkn-hub.md: 2 parameter tables")
 
 
 def test_scaffold_reports_nothing_for_a_single_table_page(tmp_path):
@@ -290,3 +290,42 @@ def test_a_backticked_header_still_marks_a_param_table():
     assert _is_param_table("| `Parameter` | Description | Default |")
     assert _is_param_table("| Parameter | Description | Default |")
     assert not _is_param_table("| Step | Notes |")
+
+
+HALF_CONVERTED = """##### Egress Scenarios
+
+{{< param-table scenario="network-chaos" source="krkn-hub" >}}
+
+##### Ingress Scenarios
+
+| Parameter | Description |
+| --- | --- |
+| WAIT_DURATION | how long |
+"""
+
+
+def test_scaffold_reports_a_half_converted_page(tmp_path):
+    """One call and one table left is the state the old bug produced. The
+    idempotency guard skips the page, so nothing else would ever mention it."""
+    website = tmp_path / "site"
+    d = website / "content/en/docs/scenarios/network-chaos"
+    d.mkdir(parents=True)
+    (d / "_index.md").write_text("---\ntitle: X\n---\n", encoding="utf-8")
+    (d / "_tab-krkn-hub.md").write_text(HALF_CONVERTED, encoding="utf-8")
+    _data(website, "network-chaos", "krkn-hub")
+    report = scaffold_scenario("network-chaos", website)
+    assert (d / "_tab-krkn-hub.md").read_text(encoding="utf-8") == HALF_CONVERTED
+    assert report == ["network-chaos/_tab-krkn-hub.md: a param-table call and 1 "
+                      "hand-written table(s), left alone. Give each param a group "
+                      "in the source, then split the page by group"]
+
+
+def test_a_fully_converted_page_is_not_reported(tmp_path):
+    website = tmp_path / "site"
+    d = website / "content/en/docs/scenarios/pvc-scenario"
+    d.mkdir(parents=True)
+    (d / "_index.md").write_text("---\ntitle: X\n---\n", encoding="utf-8")
+    (d / "_tab-krkn-hub.md").write_text(
+        '{{< param-table scenario="pvc-scenario" source="krkn-hub" >}}\n', encoding="utf-8")
+    _data(website, "pvc-scenario", "krkn-hub")
+    assert scaffold_scenario("pvc-scenario", website) == []

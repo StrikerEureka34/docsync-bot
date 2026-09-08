@@ -297,12 +297,17 @@ def scaffold_scenario(scenario, website_root):
             tab.write_text(_call(scenario, source) + "\n", encoding="utf-8")
             continue
         original = tab.read_text(encoding="utf-8")
-        n = param_tables(original)
-        if n > 1 and "param-table" not in original:
-            report.append(f"{tab.name}: {n} parameter tables, left alone. Give each "
-                          "param a group in the source, then split the page by group")
-            continue
         new = inject_shortcode(original, scenario, source)
         if new != original:
             tab.write_text(new, encoding="utf-8")
+            continue
+        # Nothing was injected. A parameter table still on the page is one a
+        # reader sees going stale, whether it is one of several or the leftover
+        # half of an earlier conversion.
+        n = param_tables(new)
+        if n:
+            what = (f"a param-table call and {n} hand-written table(s)"
+                    if "param-table" in original else f"{n} parameter tables")
+            report.append(f"{scenario}/{tab.name}: {what}, left alone. Give each "
+                          "param a group in the source, then split the page by group")
     return report

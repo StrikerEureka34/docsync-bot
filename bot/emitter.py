@@ -80,21 +80,24 @@ def load_previous(path):
     return {p["name"]: p for p in data.get("params", [])}
 
 
-def _grouped(path):
-    """True if the committed file carries any group."""
+def _groups(path):
+    """Group names in the committed file."""
     path = Path(path)
     if not path.exists():
-        return False
+        return set()
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return any(p.get("group") for p in data.get("params", []))
+    return {p["group"] for p in data.get("params", []) if p.get("group")}
 
 
 def emit_data_file(out_root, scenario, source, records, descriptions, source_ref):
     path = Path(out_root) / "data" / "params" / scenario / f"{source}.yaml"
-    # Dropping every group leaves each group= call with no rows, which fails the
-    # Hugo build a step later with an unrelated-looking error.
-    if _grouped(path) and not any(r.group for r in records):
-        raise ValueError(f"{path} has grouped rows but this run produced none")
+    # A group that goes missing leaves its group= call with no rows, which fails
+    # the Hugo build a step later with an unrelated-looking error. One missing
+    # group is enough: the other groups surviving does not save the page.
+    lost = _groups(path) - {r.group for r in records if r.group}
+    if lost:
+        raise ValueError(f"{path} would lose group(s) {', '.join(sorted(lost))}, "
+                         f"which the page still asks for")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(emit_data_text(scenario, source, records, descriptions, source_ref),
                     encoding="utf-8")
