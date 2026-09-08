@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import yaml
 
@@ -10,12 +11,19 @@ _FALLBACK_SOURCES = ("published-table", "llm", "krknctl", "crd-field",
                      "hub-doc", "built-in")
 
 
+# A description is one table cell, and the shortcode renders it as markdown. A
+# marker at the front turns the whole cell into a heading or a list.
+_LEADING_BLOCK = re.compile(r"^(\s*)(#|[-*+](?=\s))")
+
+
 def _escape(text):
-    """< and > for raw HTML, { for Hugo shortcodes. Never &, so a re-run stays
-    idempotent: the entities contain none of the escaped characters."""
+    """< and > for raw HTML, { for Hugo shortcodes, and a leading block marker.
+    Never &, so a re-run stays idempotent: the entities contain none of the
+    escaped characters, and an escaped marker no longer starts the line."""
     if not text:
         return text
-    return text.replace("<", "&lt;").replace(">", "&gt;").replace("{", "&#123;")
+    text = text.replace("<", "&lt;").replace(">", "&gt;").replace("{", "&#123;")
+    return _LEADING_BLOCK.sub(lambda m: f"{m.group(1)}&#{ord(m.group(2))};", text)
 
 
 def _param_dict(rec, description, source, scenario):

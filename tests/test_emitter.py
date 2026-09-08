@@ -278,3 +278,27 @@ def test_a_new_group_alongside_the_old_ones_is_fine(tmp_path):
                     ParamRecord(name="WAIT", group="ingress")],
                    {"EGRESS": "x", "WAIT": "y"}, "abc")
     assert "group: ingress" in out.read_text(encoding="utf-8")
+
+
+def test_a_leading_hash_cannot_turn_the_cell_into_a_heading():
+    """A hand-written cell that opens with "# " is inline where it came from.
+    The shortcode renders the cell as markdown, so it would become an <h1>."""
+    p = yaml.safe_load(emit_data_text(
+        "network-chaos", "krkn-hub", [ParamRecord(name="TARGET_NODE_AND_INTERFACE")],
+        {"TARGET_NODE_AND_INTERFACE": "# Dictionary with key as node name(s)"}, "r"))["params"][0]
+    assert p["description"] == "&#35; Dictionary with key as node name(s)"
+
+
+def test_a_leading_list_marker_is_escaped_but_a_minus_number_is_not():
+    def d(text):
+        return yaml.safe_load(emit_data_text(
+            "s", "krkn-hub", [ParamRecord(name="X")], {"X": text}, "r"))["params"][0]["description"]
+    assert d("- one of several") == "&#45; one of several"
+    assert d("-1 means unlimited") == "-1 means unlimited"
+
+
+def test_escaping_a_block_marker_stays_idempotent():
+    once = emit_data_text("s", "krkn-hub", [ParamRecord(name="X")], {"X": "# heading"}, "r")
+    twice = emit_data_text("s", "krkn-hub", [ParamRecord(name="X")],
+                           {"X": yaml.safe_load(once)["params"][0]["description"]}, "r")
+    assert once == twice
