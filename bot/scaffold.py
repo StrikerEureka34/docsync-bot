@@ -147,7 +147,8 @@ def page_section_groups(text):
     return out
 
 
-def inject_global_shortcodes(text, source, name_to_group, scenario=GLOBAL_SCENARIO):
+def inject_global_shortcodes(text, source, name_to_group, scenario=GLOBAL_SCENARIO,
+                             append_missing=True):
     """Replace each parameter table on a global page with a group-filtered
     param-table call, returning (new_text, report). Replaced only when every row
     resolves to one known group and exactly one table claims it: Kraken and
@@ -199,7 +200,7 @@ def inject_global_shortcodes(text, source, name_to_group, scenario=GLOBAL_SCENAR
     # section is the whole point of the bot: surface the drift, do not hide it.
     shown = set(re.findall(r'group="([^"]+)"', text)) | set(claims)
     stranded = {n for _, _, ns, g, why in resolved if why for n in ns}
-    for group in sorted(set(name_to_group.values()) - shown):
+    for group in sorted(set(name_to_group.values()) - shown) if append_missing else ():
         if any(name_to_group.get(n) == group for n in stranded):
             continue
         lines += ["\n---\n\n", f"## {group.replace('_', ' ').title()}\n\n",
@@ -307,8 +308,11 @@ def scaffold_scenario(scenario, website_root):
         if new == original and param_tables(original) > 1:
             # Each table gets its own group= call, and the source says which.
             split, lines = inject_global_shortcodes(
-                original, source, _declared_groups(root, scenario, source), scenario)
-            if split != original:
+                original, source, _declared_groups(root, scenario, source), scenario,
+                append_missing=False)
+            # All or nothing. Converting some tables and leaving others is the
+            # half-converted page this whole change is about.
+            if split != original and not param_tables(split):
                 new = split
                 report += [f"{scenario}/{tab.name}: {line}" for line in lines]
         if new != original:

@@ -267,6 +267,43 @@ def test_two_tables_are_split_by_the_groups_the_source_declares(tmp_path):
                       "network-chaos/_tab-krkn-hub.md: ingress: replaced 1 rows"]
 
 
+def test_a_page_is_split_all_or_nothing(tmp_path):
+    """One table resolving and the other not would leave a call beside a table,
+    which is the half-converted page this whole change is about."""
+    website, tab = _two_table_page(tmp_path, """params:
+  - name: EGRESS
+    description: shape it
+    group: egress
+  - name: WAIT_DURATION
+    description: how long
+""")
+    report = scaffold_scenario("network-chaos", website)
+    assert tab.read_text(encoding="utf-8") == TWO_TABLES
+    assert report == ["network-chaos/_tab-krkn-hub.md: 2 parameter tables, left "
+                      "alone. Give each param a group in the source, then split "
+                      "the page by group"]
+
+
+def test_a_scenario_page_gains_no_appended_section(tmp_path):
+    """The global pages append a section for a group no table claims. A scenario
+    tab is read into a tabpane, so a new ## heading there is out of place."""
+    website, tab = _two_table_page(tmp_path, """params:
+  - name: EGRESS
+    description: shape it
+    group: egress
+  - name: WAIT_DURATION
+    description: how long
+    group: ingress
+  - name: BMC_USER
+    description: bmc
+    group: baremetal
+""")
+    scaffold_scenario("network-chaos", website)
+    out = tab.read_text(encoding="utf-8")
+    assert "## Baremetal" not in out
+    assert 'group="baremetal"' not in out
+
+
 def test_two_tables_stay_put_when_the_source_declares_no_groups(tmp_path):
     """Nothing says which table is which, so guessing would strand rows."""
     website, tab = _two_table_page(tmp_path, """params:
