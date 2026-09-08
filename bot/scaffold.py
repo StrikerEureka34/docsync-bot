@@ -29,8 +29,7 @@ def param_tables(text):
 def inject_shortcode(text, scenario, source):
     """Replace the parameter table with the param-table shortcode call.
     Idempotent: returns text unchanged if a param-table call is already present.
-    Several tables are left alone: replacing one strands the rest, and which rows
-    belong to which table is the source's call, not ours."""
+    Several tables go to inject_global_shortcodes, which gives each its own."""
     if "param-table" in text or param_tables(text) > 1:
         return text
     lines = text.splitlines(keepends=True)
@@ -118,10 +117,10 @@ def published_cell(rows, name, column):
     return cells[i] if 0 <= i < len(cells) else ""
 
 
-def _group_call(source, group):
+def _group_call(source, group, scenario=GLOBAL_SCENARIO):
     # krknctl stores bare flag names but a reader types --telemetry-enabled.
     prefix = ' prefix="--"' if source == "krknctl" else ""
-    return (f'{{{{< param-table scenario="{GLOBAL_SCENARIO}" '
+    return (f'{{{{< param-table scenario="{scenario}" '
             f'source="{source}" group="{group}"{prefix} >}}}}')
 
 
@@ -148,7 +147,7 @@ def page_section_groups(text):
     return out
 
 
-def inject_global_shortcodes(text, source, name_to_group):
+def inject_global_shortcodes(text, source, name_to_group, scenario=GLOBAL_SCENARIO):
     """Replace each parameter table on a global page with a group-filtered
     param-table call, returning (new_text, report). Replaced only when every row
     resolves to one known group and exactly one table claims it: Kraken and
@@ -190,7 +189,7 @@ def inject_global_shortcodes(text, source, name_to_group):
             report.append(f"group {group} split across {claims[group]} sections, "
                           "left alone to avoid showing params twice")
             continue
-        edits.append((header, end, _group_call(source, group) + "\n"))
+        edits.append((header, end, _group_call(source, group, scenario) + "\n"))
         report.append(f"{group}: replaced {len(names)} rows")
 
     for header, end, call in reversed(edits):
@@ -205,9 +204,16 @@ def inject_global_shortcodes(text, source, name_to_group):
             continue
         lines += ["\n---\n\n", f"## {group.replace('_', ' ').title()}\n\n",
                   "Parameters found in the source that no section above covers.\n\n",
-                  _group_call(source, group) + "\n"]
+                  _group_call(source, group, scenario) + "\n"]
         report.append(f"{group}: added a section, no table claimed it")
     return "".join(lines), report
+
+
+def _declared_groups(root, scenario, source):
+    """{param: group} from the data file. No group means shared."""
+    from bot.emitter import load_previous
+    rows = load_previous(Path(root) / "data" / "params" / scenario / f"{source}.yaml")
+    return {n: p["group"] for n, p in rows.items() if p.get("group")}
 
 
 def _find_scenario_dir(website_root, scenario):
@@ -298,12 +304,17 @@ def scaffold_scenario(scenario, website_root):
             continue
         original = tab.read_text(encoding="utf-8")
         new = inject_shortcode(original, scenario, source)
+        if new == original and param_tables(original) > 1:
+            # Each table gets its own group= call, and the source says which.
+            split, lines = inject_global_shortcodes(
+                original, source, _declared_groups(root, scenario, source), scenario)
+            if split != original:
+                new = split
+                report += [f"{scenario}/{tab.name}: {line}" for line in lines]
         if new != original:
             tab.write_text(new, encoding="utf-8")
             continue
-        # Nothing was injected. A parameter table still on the page is one a
-        # reader sees going stale, whether it is one of several or the leftover
-        # half of an earlier conversion.
+        # A table still on the page is one a reader will watch go stale.
         n = param_tables(new)
         if n:
             what = (f"a param-table call and {n} hand-written table(s)"

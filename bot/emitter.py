@@ -91,9 +91,8 @@ def _groups(path):
 
 def emit_data_file(out_root, scenario, source, records, descriptions, source_ref):
     path = Path(out_root) / "data" / "params" / scenario / f"{source}.yaml"
-    # A group that goes missing leaves its group= call with no rows, which fails
-    # the Hugo build a step later with an unrelated-looking error. One missing
-    # group is enough: the other groups surviving does not save the page.
+    # A missing group leaves its group= call with no rows, which fails the Hugo
+    # build a step later. One is enough, the others surviving does not help.
     lost = _groups(path) - {r.group for r in records if r.group}
     if lost:
         raise ValueError(f"{path} would lose group(s) {', '.join(sorted(lost))}, "

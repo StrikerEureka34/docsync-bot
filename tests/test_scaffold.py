@@ -235,17 +235,51 @@ def test_a_page_with_two_parameter_tables_is_left_alone():
     assert out == TWO_TABLES
 
 
-def test_scaffold_reports_a_page_it_left_alone(tmp_path):
+def _two_table_page(tmp_path, params):
     website = tmp_path / "site"
     d = website / "content/en/docs/scenarios/network-chaos"
     d.mkdir(parents=True)
     (d / "_index.md").write_text("---\ntitle: X\n---\n", encoding="utf-8")
     (d / "_tab-krkn-hub.md").write_text(TWO_TABLES, encoding="utf-8")
-    _data(website, "network-chaos", "krkn-hub")
+    data = website / "data/params/network-chaos"
+    data.mkdir(parents=True)
+    (data / "krkn-hub.yaml").write_text(params, encoding="utf-8")
+    return website, d / "_tab-krkn-hub.md"
+
+
+def test_two_tables_are_split_by_the_groups_the_source_declares(tmp_path):
+    """Which table is which comes from the source, so the bot can finish the job
+    instead of handing it back. See docsync-bot#36."""
+    website, tab = _two_table_page(tmp_path, """params:
+  - name: EGRESS
+    description: shape it
+    group: egress
+  - name: WAIT_DURATION
+    description: how long
+    group: ingress
+""")
     report = scaffold_scenario("network-chaos", website)
-    assert (d / "_tab-krkn-hub.md").read_text(encoding="utf-8") == TWO_TABLES
-    assert len(report) == 1
-    assert report[0].startswith("network-chaos/_tab-krkn-hub.md: 2 parameter tables")
+    out = tab.read_text(encoding="utf-8")
+    assert '{{< param-table scenario="network-chaos" source="krkn-hub" group="egress" >}}' in out
+    assert '{{< param-table scenario="network-chaos" source="krkn-hub" group="ingress" >}}' in out
+    assert "| EGRESS |" not in out and "| WAIT_DURATION |" not in out
+    assert report == ["network-chaos/_tab-krkn-hub.md: egress: replaced 1 rows",
+                      "network-chaos/_tab-krkn-hub.md: ingress: replaced 1 rows"]
+
+
+def test_two_tables_stay_put_when_the_source_declares_no_groups(tmp_path):
+    """Nothing says which table is which, so guessing would strand rows."""
+    website, tab = _two_table_page(tmp_path, """params:
+  - name: EGRESS
+    description: shape it
+  - name: WAIT_DURATION
+    description: how long
+""")
+    report = scaffold_scenario("network-chaos", website)
+    assert tab.read_text(encoding="utf-8") == TWO_TABLES
+    assert report == ["network-chaos/_tab-krkn-hub.md: 2 parameter tables, left "
+                      "alone. Give each param a group in the source, then split "
+                      "the page by group"]
 
 
 def test_scaffold_reports_nothing_for_a_single_table_page(tmp_path):
